@@ -29,7 +29,10 @@ async function run() {
 const serviceCollection = client.db('fireUpRestaurant').collection('foods')
 
     app.get('/allFoods', async(req, res)=>{
-        const result = await serviceCollection.find().toArray();
+      const page = parseInt(req.query.page);
+      const limit = parseInt(req.query.limit);
+      const skip = (page-1)*limit;
+        const result = await serviceCollection.find().skip(skip).limit(limit).toArray();
         res.send(result);
     });
     app.get('/allFoods/:id', async(req, res)=> {
