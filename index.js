@@ -27,6 +27,7 @@ async function run() {
     await client.connect();
 
 const serviceCollection = client.db('fireUpRestaurant').collection('foods')
+const orderCollection = client.db('fireUpRestaurant').collection('orders')
 
     app.get('/allFoods', async(req, res)=>{
       const page = Number(req.query.page);
@@ -40,6 +41,26 @@ const serviceCollection = client.db('fireUpRestaurant').collection('foods')
         const id = req.params.id;
         const filter = {_id: new ObjectId(id)};
         const result = await serviceCollection.findOne(filter);
+        res.send(result);
+      })
+
+      // orders
+      app.post('/orders', async(req, res)=>{
+        const order = req.body;
+        const result = await orderCollection.insertOne(order)
+        res.send(result);
+      });
+      app.get('/orders', async(req, res)=> {
+        let query = {};
+        if(req.query?.email){
+          query = {email: req.query.email}
+        };
+        const result = await orderCollection.find(query).toArray()
+        res.send(result)
+      });
+      app.delete('/orders/:id', async(req, res)=> {
+        const id = req.params.id;
+        const result = await orderCollection.deleteOne({_id: new ObjectId(id)})
         res.send(result);
       })
 
