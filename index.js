@@ -30,11 +30,15 @@ const serviceCollection = client.db('fireUpRestaurant').collection('foods')
 const orderCollection = client.db('fireUpRestaurant').collection('orders')
 
     app.get('/allFoods', async(req, res)=>{
+      let query = {};
+      if(req.query?.email){
+        query = {email: req.query.email}
+      };
       const page = Number(req.query.page);
       const limit = Number(req.query.limit);
       const skip = (page -1)*limit;
       const totalFoods = await serviceCollection.countDocuments()
-        const result = await serviceCollection.find().skip(skip).limit(limit).toArray();
+        const result = await serviceCollection.find(query).skip(skip).limit(limit).toArray();
         res.send({totalFoods, result});
     });
     app.get('/allFoods/:id', async(req, res)=> {
@@ -45,7 +49,13 @@ const orderCollection = client.db('fireUpRestaurant').collection('orders')
       })
       app.post('/allFoods', async(req, res)=>{
         const addFood = req.body;
-        const result = await serviceCollection.insertOne(addFood)
+        const option = {upsert: true};
+        const result = await serviceCollection.insertOne(addFood, option)
+        res.send(result);
+      });
+      app.delete('/allFoods/:id', async(req, res)=> {
+        const id = req.params.id;
+        const result = await serviceCollection.deleteOne({_id: new ObjectId(id)})
         res.send(result);
       });
 
