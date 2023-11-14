@@ -43,6 +43,11 @@ const orderCollection = client.db('fireUpRestaurant').collection('orders')
         const result = await serviceCollection.findOne(filter);
         res.send(result);
       })
+      app.post('/allFoods', async(req, res)=>{
+        const addFood = req.body;
+        const result = await serviceCollection.insertOne(addFood)
+        res.send(result);
+      });
 
       // orders
       app.post('/orders', async(req, res)=>{
