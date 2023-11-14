@@ -31,30 +31,36 @@ const orderCollection = client.db('fireUpRestaurant').collection('orders')
 
     app.get('/allFoods', async(req, res)=>{
       let queryObj ={};
-      console.log('queryObj', queryObj);
       let sortObj = {};
-      console.log('sortObj',sortObj);
       const category = req.query.category;
-      console.log('categ',category);
       const sortField = req.query.sortField;
-      console.log('sortField',sortField);
       const sortOrder = req.query.sortOrder;
-      console.log('sortOrder',sortOrder);
       if(category){
         queryObj.category= category;
       };
-      if(sortField && sortOrder){sortObj.sortField = sortOrder}
+      if(sortField && sortOrder){sortObj[sortField] = sortOrder === 'asc' ? 1 : -1;}
       let query = {};
       if(req.query?.email){
         query = {email: req.query.email}
       };
+
+      if (Object.keys(queryObj).length > 0) {
+        query = { ...query, ...queryObj };
+      }
+      // In this update, I've merged the query and queryObj to ensure that both category filtering and other filters work together. This should help in correctly filtering foods based on the specified category.
       const page = Number(req.query.page);
       const limit = Number(req.query.limit);
       const skip = (page -1)*limit;
       const totalFoods = await serviceCollection.countDocuments()
-        const result = await serviceCollection.find(query,queryObj).skip(skip).limit(limit).sort(sortObj).toArray();
+        const result = await serviceCollection.find(query).skip(skip).limit(limit).sort(sortObj).toArray();
         res.send({totalFoods, result});
     });
+    app.get('/allFood/:name', async (req, res) => {
+      const name = req.params.name;
+      const query = { food_name: { $regex: new RegExp(name, 'i') } }; // Case-insensitive search
+      const result = await serviceCollection.find(query).toArray();
+      res.send(result);
+});
     app.get('/allFoods/:id', async(req, res)=> {
         const id = req.params.id;
         const filter = {_id: new ObjectId(id)};
