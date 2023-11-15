@@ -34,7 +34,9 @@ const orderCollection = client.db('fireUpRestaurant').collection('orders')
       let sortObj = {};
       const category = req.query.category;
       const sortField = req.query.sortField;
+      console.log('.sort best 6', {sortField});
       const sortOrder = req.query.sortOrder;
+      console.log('sort order',{sortOrder});
       if(category){
         queryObj.category= category;
       };
@@ -55,6 +57,7 @@ const orderCollection = client.db('fireUpRestaurant').collection('orders')
         const result = await serviceCollection.find(query).skip(skip).limit(limit).sort(sortObj).toArray();
         res.send({totalFoods, result});
     });
+
     app.get('/allFood/:name', async (req, res) => {
       const name = req.params.name;
       const query = { food_name: { $regex: new RegExp(name, 'i') } }; // Case-insensitive search
@@ -91,7 +94,22 @@ const orderCollection = client.db('fireUpRestaurant').collection('orders')
       // orders
       app.post('/orders', async(req, res)=>{
         const order = req.body;
-        const result = await orderCollection.insertOne(order)
+        console.log({order});
+        const id = req.body._id;
+        const filter = {_id: new ObjectId(id)};
+        console.log(filter);
+        const targetedFood = await serviceCollection.findOne(filter);
+        console.log({targetedFood});
+        delete order._id;
+        const food = {...order, order_count:Number(targetedFood.order_count)+Number(order.quantity)}
+        console.log(food);
+       
+        const updatedData = {
+          $set:{...food}
+        };
+        const option = {upsert: true};
+        const insertToFood = await serviceCollection.updateOne(filter, updatedData, option)
+        const result = await orderCollection.insertOne(food);
         res.send(result);
       });
       app.get('/orders', async(req, res)=> {
@@ -112,7 +130,6 @@ const orderCollection = client.db('fireUpRestaurant').collection('orders')
         const result = await orderCollection.findOne({_id: new ObjectId(id)})
         res.send(result);
       });
-
       app.put('/orders/:id', async(req,res)=>{
         const id = {_id: new ObjectId(req.params.id)};
         const body = req.body;
@@ -122,7 +139,8 @@ const orderCollection = client.db('fireUpRestaurant').collection('orders')
         const option = {upsert: true};
         const result = await orderCollection.updateOne(id, updatedData, option)
         res.send(result)
-      })
+      });
+
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
