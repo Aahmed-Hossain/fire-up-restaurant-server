@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
-// const jwt = require('jsonwebtoken');
-// const cookieParser =  require('cookie-parser');
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 const app = express();
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -15,7 +15,7 @@ app.use(
   })
 );
 app.use(express.json());
-// app.use(cookieParser());
+app.use(cookieParser());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ukrdjza.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
@@ -26,6 +26,24 @@ const client = new MongoClient(uri, {
   },
 });
 
+const verifyToken = (req, res, next) => {
+  const token = req.cookies.MY_TOKEN;
+  console.log("tok tok from middle ware:", token);
+  if (!token) {
+    return res.status(401).send({ message: "not authorized" });
+  }
+  jwt.verify(token, process.env.SECRET_ACCESS_TOKEN, (err, decoded) => {
+    if (err) {
+      console.log(err);
+      return res.status(401).send({ message: "un authorized" });
+    }
+    // if token valid it would be decoded
+    console.log("value in the token", decoded);
+    req.user = decoded;
+    next();
+  });
+};
+
 async function run() {
   try {
     await client.connect();
@@ -33,15 +51,27 @@ async function run() {
     const foodCollection = client.db("fireUpRestaurant").collection("foods");
     const orderCollection = client.db("fireUpRestaurant").collection("orders");
     const blogCollection = client.db("fireUpRestaurant").collection("blogs");
-
+    // json web token
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      console.log(user);
+      const token = jwt.sign(user, process.env.SECRET_ACCESS_TOKEN, {
+        expiresIn: "1d",
+      });
+      res
+        .cookie("MY_TOKEN", token, { httpOnly: true, secure: false })
+        .send({ success: true });
+    });
+    app.post("/logout", async (req, res) => {
+      const user = req.body;
+      res.clearCookie("MY_TOKEN", { maxAge: 0 }).send({ success: true });
+    });
     app.get("/allFoods", async (req, res) => {
       let queryObj = {}; // for category
-      let sortObj = {}; // for sortField+sortOrder(asc , dsc) 
+      let sortObj = {}; // for sortField+sortOrder(asc , dsc)
       const category = req.query.category;
       const sortField = req.query.sortField;
-      console.log(".sort best 6", { sortField });
       const sortOrder = req.query.sortOrder;
-      console.log("sort order", { sortOrder });
       if (category) {
         queryObj.category = category;
       }
@@ -52,7 +82,7 @@ async function run() {
       if (req.query?.email) {
         query = { email: req.query.email };
       }
-      
+
       if (Object.keys(queryObj).length > 0) {
         query = { ...query, ...queryObj };
       }
@@ -105,33 +135,29 @@ async function run() {
 
     // orders
     app.post("/orders", async (req, res) => {
-      const order = req.body; // body
-      console.log({ order });
+      const body = req.body; // body
       const id = req.body._id;
       const filter = { _id: new ObjectId(id) };
-      console.log(filter);
       const targetedFood = await foodCollection.findOne(filter);
-      console.log({ targetedFood });
-      delete order._id; // deleting _id from body parameters
+      delete body._id; // deleting _id from body parameters  as already have _id in mongodb so i can't input any key _id in mogodb
       const food = {
-        ...order,
-        quantity:Number(targetedFood.quantity)-Number(order.quantity),
-        order_count: Number(targetedFood.order_count) + Number(order.quantity),
+        ...body,
+        quantity: Number(targetedFood.quantity) - Number(body.quantity),
+        order_count: Number(targetedFood.order_count) + Number(body.quantity),
       };
-      console.log(food);
       const updatedData = {
-        $set: { ...food },
+        $set: { quantity: Number(targetedFood.quantity) - Number(body.quantity), order_count: Number(targetedFood.order_count) + Number(body.quantity), },
       };
+      const result = await orderCollection.insertOne(food);
       const option = { upsert: true };
       const insertToAllFoods = await foodCollection.updateOne(
         filter,
         updatedData,
         option
       );
-      const result = await orderCollection.insertOne(food);
       res.send(result);
     });
-    app.get("/orders", async (req, res) => {
+    app.get("/orders", verifyToken, async (req, res) => {
       let query = {};
       if (req.query?.email) {
         query = { email: req.query.email };
